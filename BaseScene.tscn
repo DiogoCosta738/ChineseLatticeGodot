@@ -1,0 +1,26 @@
+[gd_scene load_steps=4 format=3 uid="uid://v4rlrctct3m8"]
+
+[ext_resource type="Script" path="res://LatticeController.cs" id="1_5tvol"]
+[ext_resource type="Script" path="res://CameraController.cs" id="2_4x871"]
+
+[sub_resource type="FontFile" id="FontFile_mhdjw"]
+cache/0/16/0/ascent = 0.0
+cache/0/16/0/descent = 0.0
+cache/0/16/0/underline_position = 0.0
+cache/0/16/0/underline_thickness = 0.0
+cache/0/16/0/scale = 1.0
+cache/0/16/0/kerning_overrides/16/0 = Vector2(0, 0)
+
+[node name="Node2D" type="Node2D" node_paths=PackedStringArray("camera")]
+position = Vector2(0, 3)
+script = ExtResource("1_5tvol")
+width = 9
+height = 6
+lineWidth = 2.0
+outlineWidth = 5.0
+camera = NodePath("Camera2D")
+font = SubResource("FontFile_mhdjw")
+
+[node name="Camera2D" type="Camera2D" parent="."]
+script = ExtResource("2_4x871")
+CanMove = true
