@@ -1,7 +1,9 @@
-[gd_scene load_steps=4 format=3 uid="uid://v4rlrctct3m8"]
+[gd_scene load_steps=7 format=3 uid="uid://v4rlrctct3m8"]
 
 [ext_resource type="Script" path="res://LatticeController.cs" id="1_5tvol"]
 [ext_resource type="Script" path="res://CameraController.cs" id="2_4x871"]
+[ext_resource type="Script" path="res://DraggableWindow.cs" id="3_wq0a7"]
+[ext_resource type="Script" path="res://RendererController.cs" id="4_rqmuy"]
 
 [sub_resource type="FontFile" id="FontFile_mhdjw"]
 cache/0/16/0/ascent = 0.0
@@ -11,16 +13,60 @@ cache/0/16/0/underline_thickness = 0.0
 cache/0/16/0/scale = 1.0
 cache/0/16/0/kerning_overrides/16/0 = Vector2(0, 0)
 
-[node name="Node2D" type="Node2D" node_paths=PackedStringArray("camera")]
+[sub_resource type="ViewportTexture" id="ViewportTexture_bx8y2"]
+viewport_path = NodePath("SubViewport")
+
+[node name="Node2D" type="Node2D" node_paths=PackedStringArray("camera", "renderer")]
 position = Vector2(0, 3)
 script = ExtResource("1_5tvol")
 width = 9
 height = 6
 lineWidth = 2.0
-outlineWidth = 5.0
 camera = NodePath("Camera2D")
 font = SubResource("FontFile_mhdjw")
+renderer = NodePath("SubViewport/RenderController")
 
 [node name="Camera2D" type="Camera2D" parent="."]
 script = ExtResource("2_4x871")
 CanMove = true
+
+[node name="CanvasLayer" type="CanvasLayer" parent="."]
+
+[node name="TextureTarget" type="Control" parent="CanvasLayer"]
+layout_mode = 3
+anchors_preset = 0
+offset_right = 40.0
+offset_bottom = 40.0
+script = ExtResource("3_wq0a7")
+
+[node name="ColorRect" type="ColorRect" parent="CanvasLayer/TextureTarget"]
+custom_minimum_size = Vector2(0, 30)
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+offset_top = -30.0
+grow_horizontal = 2
+
+[node name="TextureRect" type="TextureRect" parent="CanvasLayer/TextureTarget"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_right = 472.0
+offset_bottom = 472.0
+grow_horizontal = 2
+grow_vertical = 2
+texture = SubResource("ViewportTexture_bx8y2")
+
+[node name="SubViewport" type="SubViewport" parent="."]
+
+[node name="RenderController" type="Node2D" parent="SubViewport" node_paths=PackedStringArray("camera", "targetRect", "textureRect", "viewport")]
+script = ExtResource("4_rqmuy")
+camera = NodePath("../Camera2D")
+targetRect = NodePath("../../CanvasLayer/TextureTarget")
+textureRect = NodePath("../../CanvasLayer/TextureTarget/TextureRect")
+viewport = NodePath("..")
+lineWidth = 2
+outlineWidth = 4
+
+[node name="Camera2D" type="Camera2D" parent="SubViewport"]

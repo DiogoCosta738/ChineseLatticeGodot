@@ -132,14 +132,10 @@ public partial class LatticeController : Node2D
 	[Export] int width = 3, height = 5;
 	[Export] bool symX = true, symY = false;
 	[Export] float cellSize = 50;
-	[Export] float lineWidth = 10;
-	[Export] float outlineWidth = 12;
+	[Export] float lineWidth = 5;
 	[Export] CameraController camera;
 	[Export] Font font;
-
-	Color outlineColor = Colors.Black;
-	Color foregroundColor = new Color(178 / 255f, 0 / 255f, 0 / 255f);
-	Color backgroundColor = new Color(255 / 255f, 232 / 255f, 165 / 255f);
+	[Export] RendererController renderer;
 
 	STState state;
 
@@ -149,7 +145,7 @@ public partial class LatticeController : Node2D
 		camera.Position = new Vector2(0,0);
 		state = new STState();
 		state.Init(width, height, symX, symY);
-		CreateTiles();
+		renderer.CreateTiles(state, symX, symY);
 		QueueRedraw();
 	}
 
@@ -165,19 +161,19 @@ public partial class LatticeController : Node2D
 		if(Input.IsActionJustPressed("advance") && !state.IsFinished())
 		{
 			state.ProcessNextEdge();
-			UpdateTiles();
+			renderer.UpdateTiles(state, symX, symY);
 			QueueRedraw();
 		}
 		if(Input.IsActionJustPressed("reset"))
 		{
 			state.Init(width, height, symX, symY);
-			UpdateTiles();
+			renderer.UpdateTiles(state, symX, symY);
 			QueueRedraw();
 		}
 		if(Input.IsActionJustPressed("new"))
 		{
 			GenerateNew();
-			UpdateTiles();
+			renderer.UpdateTiles(state, symX, symY);
 			QueueRedraw();
 		}
 	}
@@ -229,195 +225,11 @@ public partial class LatticeController : Node2D
 				// DrawString(font, GetNodeCenter(i, j), state.groups[i, j].ToString(), HorizontalAlignment.Center);
 			}
 		}
-
-		DrawFrame();
-	}
-
-	void DrawFrame()
-	{
-		RenderingMotif[,] motifs = GenerateRenderingPattern(state, symX, symY);
-		int w = motifs.GetLength(0), h = motifs.GetLength(1);
-
-		Vector2 offset = GetRenderingOffset(width, height) - new Vector2(0.5f, 0.5f) * cellSize + GetNodeCenter(0,0);
-		Rect2 rect = new Rect2(offset, new Vector2(w, h) * cellSize);
-		
-		float framePadding = 0.4f;
-		Rect2 outerRect = new Rect2( - new Vector2(framePadding / 2, framePadding / 2) * cellSize + offset, new Vector2(w + framePadding, h + framePadding) * cellSize);
-		DrawRect(outerRect, backgroundColor, true, outlineWidth);
-		DrawRect(outerRect, outlineColor, false, outlineWidth);
-		DrawRect(outerRect, foregroundColor, false, lineWidth);
-
-		DrawRect(rect, outlineColor, false, outlineWidth);
-		DrawRect(rect, foregroundColor, false, lineWidth);
 	}
 
 	Vector2 GetNodeCenter(int xx, int yy)
 	{
 		return GetMin() + new Vector2(xx + 0.5f, yy + 0.5f) * cellSize;
-	}
-
-	const int LEFT = 0;
-	const int UP = 1;
-	const int RIGHT = 2;
-	const int DOWN = 3;
-
-	static int ReflectX(int xx, int width)
-	{
-		return width - 1 - xx;
-	}
-
-	static int ReflectY(int yy, int height)
-	{
-		return height - 1 - yy;
-	}
-
-	static RenderingMotif[,] GenerateRenderingPattern(STState state, bool symX, bool symY)
-	{
-		int totalWidth = state.groups.GetLength(0);
-		if(symX) totalWidth = totalWidth * 2 - 1;
-		int totalHeight = state.groups.GetLength(1);
-		if(symY) totalHeight = totalHeight * 2 - 1;
-
-		RenderingMotif[,] motifs = new RenderingMotif[totalWidth, totalHeight];
-		for(int i = 0; i < totalWidth; i++)
-		{
-			for(int j = 0; j < totalHeight; j++)
-			{
-				motifs[i, j] = new RenderingMotif();
-			}
-		}
-
-		foreach(Vector4I edge in state.pickedEdges)
-		{
-			if(edge.X != edge.Z)
-			{
-				motifs[edge.X, edge.Y].SetConnection(RIGHT, true);
-				motifs[edge.Z, edge.W].SetConnection(LEFT, true);
-
-				if(symX)
-				{
-					motifs[ReflectX(edge.X, totalWidth), edge.Y].SetConnection(LEFT, true);
-					motifs[ReflectX(edge.Z, totalWidth), edge.W].SetConnection(RIGHT, true);
-				}
-
-				if(symY)
-				{
-					motifs[edge.X, ReflectY(edge.Y, totalHeight)].SetConnection(RIGHT, true);
-					motifs[edge.Z, ReflectY(edge.W, totalHeight)].SetConnection(LEFT, true);
-				}
-
-				if(symY && symX)
-				{
-					motifs[ReflectX(edge.X, totalWidth), ReflectY(edge.Y, totalHeight)].SetConnection(LEFT, true);
-					motifs[ReflectX(edge.Z, totalWidth), ReflectY(edge.W, totalHeight)].SetConnection(RIGHT, true);
-				}
-			}
-			else if(edge.Y != edge.W)
-			{
-				motifs[edge.X, edge.Y].SetConnection(UP, true);
-				motifs[edge.Z, edge.W].SetConnection(DOWN, true);
-
-				if(symX)
-				{
-					motifs[ReflectX(edge.X, totalWidth), edge.Y].SetConnection(UP, true);
-					motifs[ReflectX(edge.Z, totalWidth), edge.W].SetConnection(DOWN, true);
-				}
-
-				if(symY)
-				{
-					motifs[edge.X, ReflectY(edge.Y, totalHeight)].SetConnection(DOWN, true);
-					motifs[edge.Z, ReflectY(edge.W, totalHeight)].SetConnection(UP, true);
-				}
-
-				if(symY && symX)
-				{
-					motifs[ReflectX(edge.X, totalWidth), ReflectY(edge.Y, totalHeight)].SetConnection(DOWN, true);
-					motifs[ReflectX(edge.Z, totalWidth), ReflectY(edge.W, totalHeight)].SetConnection(UP, true);
-				}
-			}
-			else
-			{
-				Debug.Assert(false, "IMPOSSIBLE EDGE");
-			}
-		}
-		
-		return motifs;
-	}
-
-	Dictionary<string, Vector2I> motifToTile = new Dictionary<string, Vector2I>
-	{
-		{ "0000", new Vector2I(0,0) },
-
-		{ "1000", new Vector2I(1,0) },
-		{ "0100", new Vector2I(1,1) },
-		{ "0010", new Vector2I(1,2) },
-		{ "0001", new Vector2I(1,3) },
-		
-		{ "1100", new Vector2I(2,0) },
-		{ "0110", new Vector2I(2,1) },
-		{ "0011", new Vector2I(2,2) },
-		{ "1001", new Vector2I(2,3) },
-
-		{ "1010", new Vector2I(3,0) },
-		{ "0101", new Vector2I(3,1) },
-		
-		{ "1011", new Vector2I(4,0) },
-		{ "1101", new Vector2I(4,1) },
-		{ "1110", new Vector2I(4,2) },
-		{ "0111", new Vector2I(4,3) },
-
-		{ "1111", new Vector2I(5,0) },
-	};
-
-	LatticeTile[,] redTiles;
-	LatticeTile[,] blackTiles;
-	void CreateTiles()
-	{
-		static LatticeTile create_tile(LatticeTile[,] tiles, Vector2I motifTile, int xx, int yy, Vector2 pos, float size, float width, Color color, int zindex)
-		{
-			LatticeTile tile = new LatticeTile();
-			tile.Position = pos;
-			tile.ZIndex = zindex;
-			tiles[xx, yy] = tile;
-			
-			tile.SetMotif(motifTile.X, motifTile.Y * 90);
-			tile.SetupRenderingVariables(size, width, color);
-			return tile;
-		}
-
-		RenderingMotif[,] motifs = GenerateRenderingPattern(state, symX, symY);
-		int w = motifs.GetLength(0), h = motifs.GetLength(1);
-		redTiles = new LatticeTile[w, h];
-		blackTiles = new LatticeTile[w, h];
-		for(int i = 0; i < w; i++)
-		{
-			for(int j = 0; j < h; j++)
-			{
-				Vector2I motifTile = motifToTile[motifs[i, j].ToTileString()];
-				Vector2 offset = GetRenderingOffset(width, height);
-				Vector2 pos = GetNodeCenter(i, j) + offset;
-				AddChild(create_tile(blackTiles, motifTile, i, j, pos, cellSize, outlineWidth, outlineColor, 0));
-				AddChild(create_tile(redTiles, motifTile, i, j, pos, cellSize, lineWidth, foregroundColor, 1));
-			}
-		}
-	}
-
-	void UpdateTiles()
-	{
-		RenderingMotif[,] motifs = GenerateRenderingPattern(state, symX, symY);
-		int w = motifs.GetLength(0), h = motifs.GetLength(1);
-		for(int i = 0; i < w; i++)
-		{
-			for(int j = 0; j < h; j++)
-			{
-				Vector2I motifTile = motifToTile[motifs[i, j].ToTileString()];
-				redTiles[i,j].SetMotif(motifTile.X, motifTile.Y * 90);
-				redTiles[i,j].QueueRedraw();
-
-				blackTiles[i,j].SetMotif(motifTile.X, motifTile.Y * 90);
-				blackTiles[i,j].QueueRedraw();
-			}
-		}
 	}
 }
 
