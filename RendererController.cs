@@ -322,17 +322,17 @@ public partial class RendererController : Node2D
 		float prevAR = baseSize.X / (baseSize.Y + 0.0f);
 		if(newAR > prevAR)
 		{
-			height = Mathf.Max(minHeight, height);
+			height = Mathf.Max(minSide, height);
 			width = height * prevAR;
 		}
 		else
 		{
-			width = Mathf.Max(minWidth, width);
+			width = Mathf.Max(minSide, width);
 			height = width / prevAR;
 		}
 		// if(newAR > 0 && prevAR > 0)
 
-		Vector2 renderSize = new Vector2(Mathf.Max(minWidth, width), Mathf.Max(minHeight, height));
+		Vector2 renderSize = new Vector2(Mathf.Max(minSide, width), Mathf.Max(minSide, height));
 		Vector2 pos = new Vector2(renderMinX, renderMinY);
 		parentRect.Position = pos;
 		// textureRect.Position = pos;
@@ -467,30 +467,29 @@ public partial class RendererController : Node2D
 		ResetRenderSize();
 	}
 
-	int minWidth = 100;
-	int minHeight = 100;
+	float minSide = 250;
 	void ResizeLeft(float delta)
 	{
 		renderMinX += delta;
-		renderMinX = Mathf.Min(renderMinX, renderMaxX - minWidth);
+		renderMinX = Mathf.Min(renderMinX, renderMaxX - minSide);
 	}
 
 	void ResizeRight(float delta)
 	{
 		renderMaxX += delta;
-		renderMaxX = Mathf.Max(renderMaxX, renderMinX + minWidth);
+		renderMaxX = Mathf.Max(renderMaxX, renderMinX + minSide);
 	}
 
 	void ResizeTop(float delta)
 	{
 		renderMinY += delta;
-		renderMinY = Mathf.Min(renderMinY, renderMaxY - minHeight);
+		renderMinY = Mathf.Min(renderMinY, renderMaxY - minSide);
 	}
 
 	void ResizeBottom(float delta)
 	{
 		renderMaxY += delta;
-		renderMaxY = Mathf.Max(renderMaxY, renderMinY + minHeight);
+		renderMaxY = Mathf.Max(renderMaxY, renderMinY + minSide);
 	}
 
 

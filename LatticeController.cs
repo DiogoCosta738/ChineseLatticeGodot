@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Reflection.Metadata;
 using System.ComponentModel.DataAnnotations;
+using System.Linq;
 
 public static class Utils 
 {
@@ -126,6 +127,39 @@ public class STState
 	{
 		discardedEdges.Add(edge);
 	}
+
+	public void RecomputeState()
+	{
+		int count = 1;
+		for(int i = 0; i < groups.GetLength(0); i++)
+		{
+			for(int j = 0; j < groups.GetLength(1); j++)
+			{
+				groups[i, j] = count++;
+			}
+		}
+		
+		List<Vector4I> prevPicked = pickedEdges;
+		pickedEdges = new List<Vector4I>();
+		foreach(var edge in prevPicked) PickEdge(edge);
+
+		foreach(var edge in discardedEdges) availableEdges.Add(edge);
+		discardedEdges.Clear();
+		DiscardEdges();
+	}
+
+	public void DiscardEdges()
+	{
+		for(int i = availableEdges.Count - 1; i >= 0; i--)
+		{
+			if(!CanPickEdge(availableEdges[i]))
+			{
+				Vector4I edge = availableEdges[i];
+				availableEdges.RemoveAt(i);
+				discardedEdges.Add(edge);
+			}
+		}
+	}
 }
 
 public partial class LatticeController : Node2D
@@ -182,6 +216,8 @@ public partial class LatticeController : Node2D
 		QueueRedraw();
 	}
 
+	Vector4I closestEdge = Vector4I.Zero;
+
 	// Called every frame. 'delta' is the elapsed time since the previous frame.
 	public override void _Process(double delta)
 	{
@@ -195,6 +231,13 @@ public partial class LatticeController : Node2D
 		if(Input.IsActionJustPressed("advance") && !state.IsFinished())
 		{
 			state.ProcessNextEdge();
+			state.DiscardEdges();
+			renderer.UpdateTiles(state, symX, symY);
+			QueueRedraw();
+		}
+		if(Input.IsActionJustPressed("complete") && !state.IsFinished())
+		{
+			while(!state.IsFinished()) state.ProcessNextEdge();
 			renderer.UpdateTiles(state, symX, symY);
 			QueueRedraw();
 		}
@@ -210,6 +253,34 @@ public partial class LatticeController : Node2D
 			renderer.UpdateTiles(state, symX, symY);
 			QueueRedraw();
 		}
+
+		
+		void CheckEdge(Vector2 mousePos, ref Vector4I closestEdge, ref float closestDist2, Vector4I candidateEdge)
+		{
+			Vector2 edgeCenter = GetEdgeCenter(candidateEdge);
+			// Vector2 edgeCenter = new Vector2(candidateEdge.X + candidateEdge.Z, candidateEdge.Y + candidateEdge.W) / 2;
+			float dist2 = mousePos.DistanceSquaredTo(edgeCenter);
+			if(closestDist2 < 0 || dist2 < closestDist2)
+			{
+				closestEdge = candidateEdge;
+				closestDist2 = dist2;
+			}
+		}
+
+		closestEdge = Vector4I.Zero;
+		float closestDist2 = -1;
+		foreach(var edge in state.pickedEdges)
+		{
+			CheckEdge(mousePos, ref closestEdge, ref closestDist2, edge);
+		}
+		foreach(var edge in state.availableEdges)
+		{
+			CheckEdge(mousePos, ref closestEdge, ref closestDist2, edge);
+		}
+		foreach(var edge in state.discardedEdges)
+		{
+			CheckEdge(mousePos, ref closestEdge, ref closestDist2, edge);
+		}
 	}
 
 	public Vector2 GetMin()
@@ -222,6 +293,13 @@ public partial class LatticeController : Node2D
 	public Vector2 GetRenderingOffset(int totalWidth, int totalHeight)
 	{
 		return new Vector2(1, 0) * (totalWidth * cellSize + 50);
+	}
+
+	Vector2 GetEdgeCenter(Vector4I edge)
+	{
+		Vector2 edgeCenter = GetNodeCenter(edge.X, edge.Y) + GetNodeCenter(edge.Z, edge.W);
+		edgeCenter /= 2;
+		return edgeCenter;
 	}
 
 	public override void _Draw()
@@ -252,6 +330,14 @@ public partial class LatticeController : Node2D
 			}
 		}
 
+		if(HasEdgeSelected())
+		{
+			DrawLine(
+				GetNodeCenter(closestEdge.X, closestEdge.Y), 
+				GetNodeCenter(closestEdge.Z, closestEdge.W), 
+				Colors.White, lineWidth);
+		}
+
 		for(int i = 0; i < width; i++)
 		{
 			for(int j = 0; j < height; j++)
@@ -263,7 +349,50 @@ public partial class LatticeController : Node2D
 		DrawMouse();
 	}
 
-	Vector2 GetNodeCenter(int xx, int yy)
+	bool HasEdgeSelected()
+	{
+		return GetEdgeCenter(closestEdge).DistanceTo(mousePos) < cellSize / 2f;
+	}
+
+    public override void _UnhandledInput(InputEvent @event)
+    {
+        base._UnhandledInput(@event);
+		if (@event is InputEventMouseButton mouseEvent)
+		{
+			if (mouseEvent.ButtonIndex == MouseButton.Left && HasEdgeSelected() && mouseEvent.IsPressed())
+			{
+				bool discarded = state.discardedEdges.Contains(closestEdge);
+				bool available = state.availableEdges.Contains(closestEdge);
+				bool used = state.pickedEdges.Contains(closestEdge);
+
+				bool change = false;
+				if(used)
+				{
+					state.pickedEdges.Remove(closestEdge);
+					state.availableEdges.Add(closestEdge);
+					change = true;
+				}
+				else if(available)
+				{
+					state.pickedEdges.Add(closestEdge);
+					state.availableEdges.Remove(closestEdge);
+					change = true;
+				}
+				else
+				{
+					
+				}
+				if(change)
+				{
+					state.RecomputeState();
+					renderer.UpdateTiles(state, symX, symY);
+					QueueRedraw();
+				}
+			}
+		}
+    }
+
+    Vector2 GetNodeCenter(int xx, int yy)
 	{
 		return GetMin() + new Vector2(xx + 0.5f, yy + 0.5f) * cellSize;
 	}
