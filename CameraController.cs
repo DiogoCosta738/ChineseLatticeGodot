@@ -19,7 +19,7 @@ public partial class CameraController : Camera2D
 		{
 			int vx = (Input.IsActionPressed("camera_move_right") ? 1 : 0) + (Input.IsActionPressed("camera_move_left") ? -1 : 0);
 			int vy = (Input.IsActionPressed("camera_move_up") ? -1 : 0) + (Input.IsActionPressed("camera_move_down") ? 1 : 0);
-			float speed = baseSpeed;
+			float speed = baseSpeed / Zoom.X;
 
 			if(Input.IsActionPressed("camera_speed_up")) speed = 10;
 			Position += (new Vector2(vx,vy)).Normalized() * speed;
@@ -34,12 +34,12 @@ public partial class CameraController : Camera2D
 		{
 			if(Input.IsActionPressed("camera_zoom_out") || Input.IsActionJustPressed("camera_zoom_out"))
 			{
-				Zoom /= 1.3f;
+				Zoom /= 1.25f;
 			}
 
 			if(Input.IsActionPressed("camera_zoom_in") || Input.IsActionJustReleased("camera_zoom_in"))
 			{
-				Zoom *= 1.3f;
+				Zoom *= 1.25f;
 			}
 
 			if(Input.IsActionPressed("camera_reset"))

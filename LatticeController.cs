@@ -5,6 +5,7 @@ using System.Xml.Schema;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Reflection.Metadata;
+using System.ComponentModel.DataAnnotations;
 
 public static class Utils 
 {
@@ -137,7 +138,12 @@ public partial class LatticeController : Node2D
 	[Export] Font font;
 	[Export] RendererController renderer;
 
+	[Export] Slider widthSlider, heightSlider;
+	[Export] Label widthLabel, heightLabel;
+	[Export] Button exportButton, cameraZoomButton;
+
 	STState state;
+	Vector2 mousePos;
 
 	// Called when the node enters the scene tree for the first time.
 	public override void _Ready()
@@ -147,6 +153,16 @@ public partial class LatticeController : Node2D
 		state.Init(width, height, symX, symY);
 		renderer.CreateTiles(state, symX, symY);
 		QueueRedraw();
+
+		widthSlider.ValueChanged += (new_width) => Resize((int) new_width, height);
+		heightSlider.ValueChanged += (new_height) => Resize(width, (int) new_height);
+
+		widthSlider.Value = width;
+		heightSlider.Value = height;
+		Resize(width, height);
+
+		exportButton.Pressed += () => renderer.ExportToPNG();
+		cameraZoomButton.Pressed += () => camera.Zoom = Vector2.One * Mathf.Max(1, Mathf.RoundToInt(camera.Zoom.X));
 	}
 
 	public void GenerateNew()
@@ -155,9 +171,27 @@ public partial class LatticeController : Node2D
 		while(!state.IsFinished()) state.ProcessNextEdge();
 	}
 
+	public void Resize(int w, int h)
+	{
+		width = w;
+		height = h;
+		widthLabel.Text = "Width: " + width.ToString();
+		heightLabel.Text = "Height: " + height.ToString();
+		state.Init(width, height, symX, symY);
+		renderer.UpdateTiles(state, symX, symY);
+		QueueRedraw();
+	}
+
 	// Called every frame. 'delta' is the elapsed time since the previous frame.
 	public override void _Process(double delta)
 	{
+		Vector2 newMouse = GetGlobalMousePosition();
+		if(mousePos != newMouse)
+		{
+			mousePos = newMouse;
+			QueueRedraw();
+		}
+
 		if(Input.IsActionJustPressed("advance") && !state.IsFinished())
 		{
 			state.ProcessNextEdge();
@@ -202,19 +236,19 @@ public partial class LatticeController : Node2D
 
 		foreach(Vector4I edge in state.pickedEdges)
 		{
-			DrawLine(GetNodeCenter(edge.X, edge.Y), GetNodeCenter(edge.Z, edge.W), Colors.Green, lineWidth / 2, true);
+			DrawLine(GetNodeCenter(edge.X, edge.Y), GetNodeCenter(edge.Z, edge.W), Colors.Green, lineWidth / 2);
 		}
 
 		if(!state.IsFinished())
 		{
 			foreach(Vector4I edge in state.availableEdges)
 			{
-				DrawLine(GetNodeCenter(edge.X, edge.Y), GetNodeCenter(edge.Z, edge.W), Colors.Yellow, lineWidth / 4, true);
+				DrawLine(GetNodeCenter(edge.X, edge.Y), GetNodeCenter(edge.Z, edge.W), Colors.Yellow, lineWidth / 4);
 			}
 
 			foreach(Vector4I edge in state.discardedEdges)
 			{
-				DrawLine(GetNodeCenter(edge.X, edge.Y), GetNodeCenter(edge.Z, edge.W), Colors.Red, lineWidth / 4, true);
+				DrawLine(GetNodeCenter(edge.X, edge.Y), GetNodeCenter(edge.Z, edge.W), Colors.Red, lineWidth / 4);
 			}
 		}
 
@@ -225,11 +259,19 @@ public partial class LatticeController : Node2D
 				// DrawString(font, GetNodeCenter(i, j), state.groups[i, j].ToString(), HorizontalAlignment.Center);
 			}
 		}
+
+		DrawMouse();
 	}
 
 	Vector2 GetNodeCenter(int xx, int yy)
 	{
 		return GetMin() + new Vector2(xx + 0.5f, yy + 0.5f) * cellSize;
+	}
+
+	void DrawMouse()
+	{
+		DrawCircle(mousePos, 4, Colors.Yellow);
+
 	}
 }
 

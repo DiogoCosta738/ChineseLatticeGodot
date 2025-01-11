@@ -6,6 +6,21 @@ public partial class DraggableWindow : Control
 	Vector2 prevMouse;
 	bool mouseOn = false;
 	bool isDragging = false;
+	bool canDrag = true;
+
+	public Action<Vector2> OnDrag;
+	public Action<bool> OnHover;
+	public Action OnStartDrag, OnEndDrag;
+
+	public void EnableDrag()
+	{
+		canDrag = true;
+	}
+
+	public void DisableDrag()
+	{
+		canDrag = false;
+	}
 
 	// Called when the node enters the scene tree for the first time.
 	public override void _Ready()
@@ -17,15 +32,19 @@ public partial class DraggableWindow : Control
 	void MouseOn()
 	{
 		mouseOn = true;
+		OnHover?.Invoke(true);
 	}
 
 	void MouseOff()
 	{
 		mouseOn = false;
+		OnHover?.Invoke(false);
 	}
 
 	public override void _Input(InputEvent @event)
 	{
+		if(!canDrag) return;
+		
 		if (@event is InputEventMouseButton mouseEvent)
 		{
 			if (mouseEvent.ButtonIndex == MouseButton.Left)
@@ -51,11 +70,13 @@ public partial class DraggableWindow : Control
 	{
 		prevMouse = GetMouse();
 		isDragging = true;
+		OnStartDrag?.Invoke();
 	}
 
 	void StopDrag()
 	{
 		isDragging = false;
+		OnEndDrag?.Invoke();
 	}
 
 	void UpdateDrag()
@@ -63,6 +84,7 @@ public partial class DraggableWindow : Control
 		Vector2 mouseDelta = GetMouse() - prevMouse;
 		Position += mouseDelta;
 		prevMouse = GetMouse();
+		OnDrag?.Invoke(mouseDelta);
 	}
 
 

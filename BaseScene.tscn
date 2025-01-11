@@ -13,33 +13,40 @@ cache/0/16/0/underline_thickness = 0.0
 cache/0/16/0/scale = 1.0
 cache/0/16/0/kerning_overrides/16/0 = Vector2(0, 0)
 
-[sub_resource type="ViewportTexture" id="ViewportTexture_bx8y2"]
+[sub_resource type="ViewportTexture" id="ViewportTexture_barya"]
 viewport_path = NodePath("SubViewport")
 
-[node name="Node2D" type="Node2D" node_paths=PackedStringArray("camera", "renderer")]
+[node name="Node2D" type="Node2D" node_paths=PackedStringArray("camera", "renderer", "widthSlider", "heightSlider", "widthLabel", "heightLabel", "exportButton", "cameraZoomButton")]
 position = Vector2(0, 3)
 script = ExtResource("1_5tvol")
-width = 9
+width = 4
 height = 6
-lineWidth = 2.0
 camera = NodePath("Camera2D")
 font = SubResource("FontFile_mhdjw")
 renderer = NodePath("SubViewport/RenderController")
+widthSlider = NodePath("CanvasLayer/VBoxContainer/WidthSlider")
+heightSlider = NodePath("CanvasLayer/VBoxContainer/HeightSlider")
+widthLabel = NodePath("CanvasLayer/VBoxContainer/WidthLabel")
+heightLabel = NodePath("CanvasLayer/VBoxContainer/HeightLabel")
+exportButton = NodePath("CanvasLayer/VBoxContainer/Export")
+cameraZoomButton = NodePath("CanvasLayer/VBoxContainer/RoundCameraZoomButton")
 
 [node name="Camera2D" type="Camera2D" parent="."]
+zoom = Vector2(2, 2)
 script = ExtResource("2_4x871")
 CanMove = true
 
 [node name="CanvasLayer" type="CanvasLayer" parent="."]
 
-[node name="TextureTarget" type="Control" parent="CanvasLayer"]
+[node name="ParentTexture" type="Control" parent="CanvasLayer"]
 layout_mode = 3
-anchors_preset = 0
-offset_right = 40.0
-offset_bottom = 40.0
+offset_left = -348.0
+offset_top = -55.0
+offset_right = -308.0
+offset_bottom = -15.0
 script = ExtResource("3_wq0a7")
 
-[node name="ColorRect" type="ColorRect" parent="CanvasLayer/TextureTarget"]
+[node name="ColorRect" type="ColorRect" parent="CanvasLayer/ParentTexture"]
 custom_minimum_size = Vector2(0, 30)
 layout_mode = 1
 anchors_preset = 10
@@ -47,7 +54,31 @@ anchor_right = 1.0
 offset_top = -30.0
 grow_horizontal = 2
 
-[node name="TextureRect" type="TextureRect" parent="CanvasLayer/TextureTarget"]
+[node name="HBoxContainer" type="HBoxContainer" parent="CanvasLayer/ParentTexture/ColorRect"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+alignment = 2
+
+[node name="ScaleDownButton" type="Button" parent="CanvasLayer/ParentTexture/ColorRect/HBoxContainer"]
+layout_mode = 2
+focus_mode = 0
+text = "-"
+
+[node name="ScaleUpButton" type="Button" parent="CanvasLayer/ParentTexture/ColorRect/HBoxContainer"]
+layout_mode = 2
+focus_mode = 0
+text = "+"
+
+[node name="HideButton" type="Button" parent="CanvasLayer/ParentTexture/ColorRect/HBoxContainer"]
+layout_mode = 2
+focus_mode = 0
+text = "x"
+
+[node name="TextureRect" type="TextureRect" parent="CanvasLayer/ParentTexture"]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -56,17 +87,122 @@ offset_right = 472.0
 offset_bottom = 472.0
 grow_horizontal = 2
 grow_vertical = 2
-texture = SubResource("ViewportTexture_bx8y2")
+texture = SubResource("ViewportTexture_barya")
+expand_mode = 1
+stretch_mode = 4
+
+[node name="DragBL" type="ColorRect" parent="CanvasLayer/ParentTexture/TextureRect"]
+layout_mode = 0
+offset_right = 20.0
+offset_bottom = 20.0
+color = Color(1, 0, 0, 0.0980392)
+script = ExtResource("3_wq0a7")
+
+[node name="DragBR" type="ColorRect" parent="CanvasLayer/ParentTexture/TextureRect"]
+layout_mode = 0
+offset_right = 20.0
+offset_bottom = 20.0
+color = Color(1, 0, 0, 0.0980392)
+script = ExtResource("3_wq0a7")
+
+[node name="DragTL" type="ColorRect" parent="CanvasLayer/ParentTexture/TextureRect"]
+layout_mode = 0
+offset_right = 20.0
+offset_bottom = 20.0
+color = Color(1, 0, 0, 0.0980392)
+script = ExtResource("3_wq0a7")
+
+[node name="DragTR" type="ColorRect" parent="CanvasLayer/ParentTexture/TextureRect"]
+layout_mode = 0
+offset_right = 20.0
+offset_bottom = 20.0
+color = Color(1, 0, 0, 0.0980392)
+script = ExtResource("3_wq0a7")
+
+[node name="VBoxContainer" type="VBoxContainer" parent="CanvasLayer"]
+offset_left = 6.0
+offset_top = 5.0
+offset_right = 124.0
+offset_bottom = 130.0
+
+[node name="WidthLabel" type="Label" parent="CanvasLayer/VBoxContainer"]
+layout_mode = 2
+text = "Width: "
+
+[node name="WidthSlider" type="HSlider" parent="CanvasLayer/VBoxContainer"]
+layout_mode = 2
+focus_mode = 0
+min_value = 1.0
+max_value = 10.0
+value = 1.0
+rounded = true
+
+[node name="HeightLabel" type="Label" parent="CanvasLayer/VBoxContainer"]
+layout_mode = 2
+text = "Height: "
+
+[node name="HeightSlider" type="HSlider" parent="CanvasLayer/VBoxContainer"]
+layout_mode = 2
+focus_mode = 0
+min_value = 1.0
+max_value = 10.0
+value = 1.0
+rounded = true
+
+[node name="RoundCameraZoomButton" type="Button" parent="CanvasLayer/VBoxContainer"]
+visible = false
+layout_mode = 2
+focus_mode = 0
+text = "Round Camera Zoom"
+
+[node name="Export" type="Button" parent="CanvasLayer/VBoxContainer"]
+layout_mode = 2
+focus_mode = 0
+text = "Export to PNG"
+
+[node name="VBoxContainer2" type="VBoxContainer" parent="CanvasLayer"]
+offset_left = 166.0
+offset_top = 3.0
+offset_right = 366.0
+offset_bottom = 43.0
+
+[node name="OutlineLabel" type="Label" parent="CanvasLayer/VBoxContainer2"]
+layout_mode = 2
+
+[node name="OutlineSlider" type="HSlider" parent="CanvasLayer/VBoxContainer2"]
+layout_mode = 2
+max_value = 10.0
+rounded = true
+
+[node name="LineLabel" type="Label" parent="CanvasLayer/VBoxContainer2"]
+layout_mode = 2
+
+[node name="ThicknessSlider" type="HSlider" parent="CanvasLayer/VBoxContainer2"]
+layout_mode = 2
+max_value = 10.0
+rounded = true
 
 [node name="SubViewport" type="SubViewport" parent="."]
 
-[node name="RenderController" type="Node2D" parent="SubViewport" node_paths=PackedStringArray("camera", "targetRect", "textureRect", "viewport")]
+[node name="RenderController" type="Node2D" parent="SubViewport" node_paths=PackedStringArray("camera", "parentRect", "textureRect", "viewport", "outlineSlider", "lineSlider", "outlineLabel", "lineLabel", "scaleUpButton", "scaleDownButton", "hideButton", "dragTL", "dragTR", "dragBL", "dragBR", "parentDragWindow")]
 script = ExtResource("4_rqmuy")
 camera = NodePath("../Camera2D")
-targetRect = NodePath("../../CanvasLayer/TextureTarget")
-textureRect = NodePath("../../CanvasLayer/TextureTarget/TextureRect")
+parentRect = NodePath("../../CanvasLayer/ParentTexture")
+textureRect = NodePath("../../CanvasLayer/ParentTexture/TextureRect")
 viewport = NodePath("..")
 lineWidth = 2
 outlineWidth = 4
+outlineSlider = NodePath("../../CanvasLayer/VBoxContainer2/OutlineSlider")
+lineSlider = NodePath("../../CanvasLayer/VBoxContainer2/ThicknessSlider")
+outlineLabel = NodePath("../../CanvasLayer/VBoxContainer2/OutlineLabel")
+lineLabel = NodePath("../../CanvasLayer/VBoxContainer2/LineLabel")
+scaleUpButton = NodePath("../../CanvasLayer/ParentTexture/ColorRect/HBoxContainer/ScaleUpButton")
+scaleDownButton = NodePath("../../CanvasLayer/ParentTexture/ColorRect/HBoxContainer/ScaleDownButton")
+hideButton = NodePath("../../CanvasLayer/ParentTexture/ColorRect/HBoxContainer/HideButton")
+dragTL = NodePath("../../CanvasLayer/ParentTexture/TextureRect/DragTL")
+dragTR = NodePath("../../CanvasLayer/ParentTexture/TextureRect/DragTR")
+dragBL = NodePath("../../CanvasLayer/ParentTexture/TextureRect/DragBL")
+dragBR = NodePath("../../CanvasLayer/ParentTexture/TextureRect/DragBR")
+parentDragWindow = NodePath("../../CanvasLayer/ParentTexture")
 
 [node name="Camera2D" type="Camera2D" parent="SubViewport"]

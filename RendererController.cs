@@ -2,21 +2,67 @@ using Godot;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Runtime.CompilerServices;
+
+public class ObjectPool<T> where T: Node
+{
+	Node parent;
+	List<T> availableObjects;
+	
+	Func<T> constructor;
+
+	public ObjectPool(Node parent, Func<T> constructor, int objCount)
+	{
+		this.parent = parent;
+		this.constructor = constructor;
+		availableObjects = new List<T>();
+		for(int i = 0; i < objCount; i++) availableObjects.Add(constructor());
+	}
+
+	public T GetObject()
+	{
+		T obj;
+		if(availableObjects.Count == 0)
+			obj = constructor();
+		else
+		{
+			int last = availableObjects.Count - 1;
+			obj = availableObjects[last];
+			availableObjects.RemoveAt(last);
+		}
+		parent.AddChild(obj);
+		return obj;
+	}
+
+	public void ReturnObject(T obj)
+	{
+		parent.RemoveChild(obj);
+		availableObjects.Add(obj);
+	}
+}
 
 public partial class RendererController : Node2D
 {
 	[Export] Camera2D camera;
-	[Export] Control targetRect;
+	[Export] Control parentRect;
 	[Export] TextureRect textureRect;
 	[Export] SubViewport viewport;
 
 	[Export] int lineWidth = 10;
 	[Export] int outlineWidth = 12;
 	[Export] int framePadding = 20; 
+
+	[Export] Slider outlineSlider, lineSlider;
+	[Export] Label outlineLabel, lineLabel;
+	[Export] Button scaleUpButton, scaleDownButton, hideButton;
+	[Export] DraggableWindow dragTL, dragTR, dragBL, dragBR;
+	[Export] DraggableWindow parentDragWindow;
+
 	Color outlineColor = Colors.Black;
 	Color foregroundColor = new Color(178 / 255f, 0 / 255f, 0 / 255f);
 	Color backgroundColor = new Color(255 / 255f, 232 / 255f, 165 / 255f);
 
+	ObjectPool<LatticeTile> tilePool;
 
 	int width, height;
 	int cellSize = 50;
@@ -25,6 +71,10 @@ public partial class RendererController : Node2D
 	const int UP = 1;
 	const int RIGHT = 2;
 	const int DOWN = 3;
+
+	int internalResolutionScale = 1;
+	float renderMinX, renderMaxX, renderMinY, renderMaxY;
+	float renderScale = 1;
 	
 	Dictionary<string, Vector2I> motifToTile = new Dictionary<string, Vector2I>
 	{
@@ -155,9 +205,9 @@ public partial class RendererController : Node2D
 	LatticeTile[,] blackTiles;
 	public void CreateTiles(STState state, bool symX, bool symY)
 	{
-		static LatticeTile create_tile(LatticeTile[,] tiles, Vector2I motifTile, int xx, int yy, Vector2 pos, float size, float width, Color color, int zindex)
+		static LatticeTile create_tile(ObjectPool<LatticeTile> pool, LatticeTile[,] tiles, Vector2I motifTile, int xx, int yy, Vector2 pos, float size, float width, Color color, int zindex)
 		{
-			LatticeTile tile = new LatticeTile();
+			LatticeTile tile = pool.GetObject();
 			tile.Position = pos;
 			tile.ZIndex = zindex;
 			tiles[xx, yy] = tile;
@@ -180,8 +230,22 @@ public partial class RendererController : Node2D
 				Vector2I motifTile = motifToTile[motifs[i, j].ToTileString()];
 				Vector2 offset = GetRenderingOffset(width, height);
 				Vector2 pos = GetNodeCenter(i, j) + offset;
-				AddChild(create_tile(blackTiles, motifTile, i, j, pos, cellSize, outlineWidth, outlineColor, 0));
-				AddChild(create_tile(redTiles, motifTile, i, j, pos, cellSize, lineWidth, foregroundColor, 1));
+				create_tile(tilePool, blackTiles, motifTile, i, j, pos, cellSize, outlineWidth, outlineColor, 0);
+				create_tile(tilePool, redTiles, motifTile, i, j, pos, cellSize, lineWidth, foregroundColor, 1);
+			}
+		}
+	}
+
+	public void FreeTiles()
+	{
+		int w = redTiles.GetLength(0);
+		int h = redTiles.GetLength(1);
+		for(int i = 0; i < w; i++)
+		{
+			for(int j = 0; j < h; j++)
+			{
+				tilePool.ReturnObject(redTiles[i, j]);
+				tilePool.ReturnObject(blackTiles[i, j]);
 			}
 		}
 	}
@@ -190,6 +254,13 @@ public partial class RendererController : Node2D
 	{
 		RenderingMotif[,] motifs = GenerateRenderingPattern(state, symX, symY);
 		int w = motifs.GetLength(0), h = motifs.GetLength(1);
+
+		if(width != w || height != h)
+		{
+			FreeTiles();
+			CreateTiles(state, symX, symY);			
+		}
+
 		for(int i = 0; i < w; i++)
 		{
 			for(int j = 0; j < h; j++)
@@ -209,7 +280,7 @@ public partial class RendererController : Node2D
 		UpdateRendering();
 	}
 
-	void UpdateRendering()
+	Vector2I GetBaseTextureSize()
 	{
 		Vector2I size = new Vector2I(width, height) * cellSize;
 		Vector2I padding = Vector2I.One * framePadding;
@@ -217,13 +288,61 @@ public partial class RendererController : Node2D
 		size += new Vector2I(1, 1) * outlineWidth;
 		size += padding;
 
-		Vector2I textureSize = size;
-		targetRect.Size = textureSize;
+		return size;
+	}
+
+	void UpdateRendering()
+	{
+		Vector2I size = GetBaseTextureSize();
+
+		Vector2I textureSize = size * internalResolutionScale;
 		viewport.Size = textureSize;
-		camera.Zoom = Vector2.One;
-		// camera.Position = new Vector2(0, outlineWidth * 0.5f);
-		textureRect.Size = textureSize;
-		GD.Print(targetRect.Size);
+		camera.Zoom = Vector2.One * internalResolutionScale;
+
+		UpdateRenderSize();
+	}
+
+	void ResetRenderSize()
+	{
+		Vector2I baseSize = GetBaseTextureSize();
+		renderMinX = 440;
+		renderMinY = 440;
+		renderMaxX = renderMinX + baseSize.X;
+		renderMaxY = renderMinY + baseSize.Y;
+		UpdateRenderSize();
+	}
+
+	void UpdateRenderSize()
+	{
+		Vector2I baseSize = GetBaseTextureSize();
+		float width = renderMaxX - renderMinX;
+		float height = renderMaxY - renderMinY;
+
+		float newAR = width / height;
+		float prevAR = baseSize.X / (baseSize.Y + 0.0f);
+		if(newAR > prevAR)
+		{
+			height = Mathf.Max(minHeight, height);
+			width = height * prevAR;
+		}
+		else
+		{
+			width = Mathf.Max(minWidth, width);
+			height = width / prevAR;
+		}
+		// if(newAR > 0 && prevAR > 0)
+
+		Vector2 renderSize = new Vector2(Mathf.Max(minWidth, width), Mathf.Max(minHeight, height));
+		Vector2 pos = new Vector2(renderMinX, renderMinY);
+		parentRect.Position = pos;
+		// textureRect.Position = pos;
+		parentRect.Size = renderSize;
+		textureRect.Size = renderSize;
+
+		dragBL.Position = new Vector2(0, height) - new Vector2(dragBL.Size.X, 0);
+		dragBR.Position = new Vector2(width, height);
+		dragTL.Position = new Vector2(0,0) - new Vector2(dragBL.Size.X, 0);
+		dragTR.Position = new Vector2(width, 0);
 	}
 
 	void DrawFrame()
@@ -239,11 +358,11 @@ public partial class RendererController : Node2D
 		DrawRect(rect, foregroundColor, false, lineWidth);
 	}
 
-	void ExportToPNG()
+	public void ExportToPNG()
 	{
 		ViewportTexture texture = viewport.GetTexture();
 		Image image = texture.GetImage();
-		// image.Resize(image.GetWidth(), image.GetHeight(), Image.Interpolation.Nearest);
+		image.Resize(image.GetWidth(), image.GetHeight(), Image.Interpolation.Nearest);
 
 		// Save the image as a PNG
 		string save_path = "user://exported_viewport.png";
@@ -254,10 +373,126 @@ public partial class RendererController : Node2D
 			GD.Print("Failed to save image. Error code: ", error);
 	}
 
+	void UpdateThickness(LatticeTile[,] tiles, int thickness, Color color)
+	{
+		for(int x = 0; x < tiles.GetLength(0); x++)
+			for(int y = 0; y < tiles.GetLength(1); y++)
+				tiles[x,y].SetupRenderingVariables(cellSize, thickness, color);
+	}
+
+	void SetupCornerVisibility(DraggableWindow corner)
+	{
+		/*
+		ColorRect cr = corner as ColorRect;
+		Color col = cr.Color;
+		corner.OnHover += (hover) => cr.Color = new Color(col.R, col.G, col.B, hover ? 1 : 0);
+		*/
+	}
+
 	// Called when the node enters the scene tree for the first time.
 	public override void _Ready()
 	{
+		tilePool = new ObjectPool<LatticeTile>(this, () => new LatticeTile(), 5);
+		
+		outlineSlider.Value = outlineWidth - lineWidth;
+		lineSlider.Value = lineWidth;
+		outlineLabel.Text = "Outline thickness: " + outlineSlider.Value.ToString();
+		lineLabel.Text = "Line thickness: " + lineSlider.Value.ToString();
+		
+		outlineSlider.ValueChanged += (thickness) => {
+			outlineWidth = (int) lineSlider.Value + (int)thickness;
+			outlineLabel.Text = "Outline thickness: " + thickness.ToString();
+			UpdateThickness(blackTiles, outlineWidth, outlineColor);
+			UpdateRendering();
+		};
+		lineSlider.ValueChanged += (thickness) => {
+			lineWidth = (int) thickness;
+			outlineWidth = (int) outlineSlider.Value + lineWidth;
+			lineLabel.Text = "Line thickness: " + thickness.ToString();
+			UpdateThickness(redTiles, lineWidth, foregroundColor);
+			UpdateThickness(blackTiles, outlineWidth, outlineColor);
+			UpdateRendering();
+		};
+
+		scaleDownButton.Pressed += () => {
+			renderScale /= 1.5f;
+			UpdateRenderSize();
+		};
+
+		scaleUpButton.Pressed += () => {
+			renderScale *= 1.5f;
+			UpdateRenderSize();
+		};
+
+		SetupCornerVisibility(dragBL);
+		SetupCornerVisibility(dragTL);
+		SetupCornerVisibility(dragTR);
+		SetupCornerVisibility(dragBR);
+
+		dragBL.OnDrag += (delta) => {
+			ResizeLeft(delta.X);
+			ResizeBottom(delta.Y);
+			UpdateRenderSize();
+		};
+		dragTL.OnDrag += (delta) => {
+			ResizeLeft(delta.X);
+			ResizeTop(delta.Y);
+			UpdateRenderSize();
+		};
+		dragBR.OnDrag += (delta) => {
+			ResizeRight(delta.X);
+			ResizeBottom(delta.Y);
+			UpdateRenderSize();
+		};
+		dragTR.OnDrag += (delta) => {
+			ResizeRight(delta.X);
+			ResizeTop(delta.Y);
+			UpdateRenderSize();
+		};
+
+		parentDragWindow.OnDrag += (delta) => {
+			renderMinX += delta.X;
+			renderMaxX += delta.X;
+			renderMinY += delta.Y;
+			renderMaxY += delta.Y;
+			UpdateRenderSize();
+		};
+
+		hideButton.Pressed += () => {
+			textureRect.Visible = !textureRect.Visible;
+			if(textureRect.Visible) parentDragWindow.EnableDrag();
+			else parentDragWindow.DisableDrag();
+		};
+
+		ResetRenderSize();
 	}
+
+	int minWidth = 100;
+	int minHeight = 100;
+	void ResizeLeft(float delta)
+	{
+		renderMinX += delta;
+		renderMinX = Mathf.Min(renderMinX, renderMaxX - minWidth);
+	}
+
+	void ResizeRight(float delta)
+	{
+		renderMaxX += delta;
+		renderMaxX = Mathf.Max(renderMaxX, renderMinX + minWidth);
+	}
+
+	void ResizeTop(float delta)
+	{
+		renderMinY += delta;
+		renderMinY = Mathf.Min(renderMinY, renderMaxY - minHeight);
+	}
+
+	void ResizeBottom(float delta)
+	{
+		renderMaxY += delta;
+		renderMaxY = Mathf.Max(renderMaxY, renderMinY + minHeight);
+	}
+
 
 	// Called every frame. 'delta' is the elapsed time since the previous frame.
 	public override void _Process(double delta)
